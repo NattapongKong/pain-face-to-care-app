@@ -10,10 +10,19 @@
   result across the two features, so each view gets a fresh composable
   call instead.
 
-  The oval/label overlay is a deliberately lightweight LOCAL duplicate of
-  spec §8's look (ScanPanel is Task 4's file — this view never touches it),
-  reduced to only what a baseline-only capture actually needs: no live
-  per-category bars (there is no expression phase here to feed them).
+  The mild-oval guide/progress-arc/label overlay is a deliberately
+  lightweight LOCAL duplicate of spec §8's look (ScanPanel is Task 4's file
+  — this view never touches it), reduced to only what a baseline-only
+  capture actually needs: no live per-category bars (there is no expression
+  phase here to feed them). R5-T1 (owner request) swapped the guide's old
+  elliptical cutout for a progress ring + a milder ellipse, mirroring
+  ScanPanel.vue's own R5-T1 change by hand (still no shared component). R5-T1
+  round 1 (owner feedback on the live deploy) walked the intermediate pure
+  circle back to a mild oval and fixed a progress-ring rendering bug. R5-T1
+  round 2 (owner: "the progress ring is awkward") deleted that separate
+  concentric ring entirely in favor of a progress ARC painted directly on
+  the guide's own path — see the overlay SVG's own comment below for all
+  three rounds.
 -->
 <script>
 // Pure save-flow logic, extracted per plan Task 6 so
@@ -111,6 +120,28 @@ function goHome() {
 }
 
 const statusLabel = computed(() => (state.faceDetected ? 'ตรวจพบใบหน้า' : 'จัดใบหน้าให้อยู่ในกรอบ'))
+
+// Face-guide progress arc (R5-T1 round 3 — owner: "ring misorientation"):
+// painted directly on the guide ellipse's own path in the video overlay SVG
+// above. Round 2 used a constant dasharray="100" plus a progress-driven
+// dashoffset and a transform="rotate(-90 cx cy)" to relocate the dash start
+// to 12 o'clock — but rotating an ELLIPSE swaps its rx/ry, so the arc
+// traced the wrong shape (see the template's own root-cause comment for the
+// full derivation). Round 3 drops the rotate transform completely and
+// instead uses a CONSTANT stroke-dashoffset="25" (a plain template
+// attribute, not driven from here) paired with a progress-driven two-value
+// dasharray computed below — dasharray is now what animates, not offset.
+// Still pathLength="100" normalization. The template's
+// `v-if="state.phase === 'baseline'"` wrapping both the shadow and arc
+// paths (not this computed) is the other half of the fix — neither element
+// exists outside that one timed phase, so this computed only ever needs to
+// be correct while it's already true; kept as a hand-duplicated computed
+// here per this view's existing "no shared component" stance, mirroring
+// ScanPanel.vue's own face-guide arc by hand.
+const faceArcDasharray = computed(() => {
+  const filled = state.progress * 100
+  return `${filled} ${100 - filled}`
+})
 
 // Countdown numeral must NEVER render outside phase 'countdown' (a stale
 // 3/2/1 lingering into 'baseline' would read as the capture stalling) — the
@@ -286,23 +317,140 @@ watch(
             autoplay
           ></video>
 
+          <!-- Mild-oval face guide (R5-T1 round 1: owner feedback called a
+               pure circle "does not match face shape"; wants a MILD oval —
+               old ellipse was ~1:1.69 height:width, far too elongated;
+               target ~1:1.2). This viewBox (0 0 300 400) already matches
+               the video's own aspect-[3/4] container exactly, so user
+               units ARE on-screen proportions — no distortion math needed
+               (unlike ScanPanel.vue's sibling overlay, which had to
+               recalibrate its own square viewBox first — see that file's
+               comment). rx=98 ry=118 -> ry/rx = 1.204, ~1.2x taller than
+               wide on screen, the mild-oval target; rx=98 also keeps
+               roughly the same horizontal reach as the old ellipse's rx
+               (105).
+
+               R5-T1 round 2 (owner: "the progress ring is awkward" — a
+               screenshot at 70% showed a thick translucent gray band + a
+               fat red arc riding offset from the guide, i.e. three
+               competing rings including the green guide outline). Round
+               1's separate concentric track+arc ellipses (rx111/ry131) are
+               DELETED — no gap ring, no gray band. The progress arc below
+               instead shares the guide's own cx/cy/rx/ry, so it visibly
+               paints over the guide outline as it sweeps rather than
+               existing as a second ring. Two stacked paths: a wider,
+               translucent dark stroke first (contrast halo, so the white
+               arc stays legible over both the dark scrim and bright
+               video/skin at the boundary), then the white arc on top.
+               Stroke widths tuned in USER units for this viewBox's own CTM
+               scale (this container renders around ~675px wide, scale
+               ~675/300 = 2.25x) to land at ~4-5 real device px for the
+               arc: 2 user units × 2.25 = 4.5px; the halo is 3 user units
+               (~6.75px) so it peeks out ~2px around the arc. Dropped the
+               round-1 navy/red baseline color for this arc (plain white +
+               dark halo instead) — this view only ever has one timed
+               phase anyway, so there was never a real split to lose.
+
+               R5-T1 round 3 (owner: "ring misorientation"). ROOT CAUSE of
+               round 2's bug: transform="rotate(-90 cx cy)" only relocates
+               the dash start on a CIRCLE — on an ELLIPSE (rx != ry) it
+               rotates the WHOLE SHAPE and SWAPS ITS AXES, so the arc/halo
+               traced a landscape ellipse (118x98 effective) over this
+               portrait guide (98x118), crossing it at four points instead
+               of riding it.
+
+               FIX: NO transform at all — these two paths are pixel-
+               identical ellipses to the guide. Relocate the dash start
+               with dash math instead. An SVG <ellipse>'s equivalent path
+               starts at the RIGHT point (cx+rx, cy) and proceeds CLOCKWISE
+               on screen (SVG2 spec traversal order: right -> bottom ->
+               left -> top -> back to right). Independently verified for
+               this exact rx/ry pair by true arc-length integration (an
+               axis-aligned ellipse's mirror symmetry across both axes
+               forces its 4 quadrants to have EXACTLY equal arc length
+               regardless of eccentricity) that with pathLength="100" the
+               top point sits at path position EXACTLY 75. A point at path
+               distance s is "on" (painted) iff (s + stroke-dashoffset) mod
+               100 < dash1 (the first dasharray value). With the constant
+               stroke-dashoffset="25" below and dasharray="{L} {100-L}" (L
+               = progress*100): solving (s+25) mod 100 = 0 gives s=75 as
+               the on-region's start, and increasing s from 75 moves
+               toward s=100(=0, the right point) next — clockwise on
+               screen, exactly the SVG traversal direction. Verified
+               numerically (not just by hand) by simulating the actual
+               on/off decision across progress 0/0.25/0.5/0.75/1: the
+               visible arc always starts at s=75 and grows forward by
+               exactly L units. dashoffset is now a plain CONSTANT — the
+               CSS transition moved from stroke-dashoffset to
+               stroke-dasharray (a two-value list summing to 100
+               throughout, a stable case for CSS transitions). Left
+               UNSUPPRESSED at progress 0 ("0 100" + round linecap): a
+               small round ~5px dot at the 12-o'clock start point, accepted
+               as a legitimate start marker rather than adding a
+               v-if="progress > 0" that would just relocate the pop-in/out
+               flicker to a different threshold. -->
           <svg viewBox="0 0 300 400" class="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <mask id="baseline-oval-mask">
+              <mask id="baseline-face-mask">
                 <rect x="0" y="0" width="300" height="400" fill="white" />
-                <ellipse cx="150" cy="190" rx="105" ry="140" fill="black" />
+                <ellipse cx="150" cy="190" rx="98" ry="118" fill="black" />
               </mask>
             </defs>
-            <rect x="0" y="0" width="300" height="400" fill="black" fill-opacity="0.55" mask="url(#baseline-oval-mask)" />
+            <rect x="0" y="0" width="300" height="400" fill="black" fill-opacity="0.55" mask="url(#baseline-face-mask)" />
             <ellipse
               cx="150"
               cy="190"
-              rx="105"
-              ry="140"
+              rx="98"
+              ry="118"
               fill="none"
               :stroke="state.faceDetected ? '#16a34a' : '#e2e8f0'"
               stroke-width="4"
+              data-testid="face-guide"
             />
+            <!-- Progress arc (R5-T1 round 3): drawn ON the guide's own
+                 ellipse path (identical cx/cy/rx/ry to the guide above),
+                 v-if-gated to state.phase === 'baseline' — this view's only
+                 timed capture phase (beginBaselineCapture() never enters
+                 'capturing'; see useFaceScan.js) — so neither path exists
+                 outside it. pathLength="100" + a constant
+                 stroke-dashoffset="25" + a progress-driven two-value
+                 dasharray (see the overlay's own comment above for the
+                 full start-point/direction derivation) fills clockwise
+                 from 12 o'clock with NO transform. -->
+            <template v-if="state.phase === 'baseline'">
+              <ellipse
+                cx="150"
+                cy="190"
+                rx="98"
+                ry="118"
+                fill="none"
+                stroke="#000000"
+                stroke-opacity="0.35"
+                stroke-width="3"
+                stroke-linecap="round"
+                pathLength="100"
+                stroke-dashoffset="25"
+                :stroke-dasharray="faceArcDasharray"
+                class="transition-[stroke-dasharray] duration-150 ease-linear"
+                data-testid="face-progress-arc-shadow"
+              />
+              <ellipse
+                cx="150"
+                cy="190"
+                rx="98"
+                ry="118"
+                fill="none"
+                stroke="#ffffff"
+                stroke-opacity="0.95"
+                stroke-width="2"
+                stroke-linecap="round"
+                pathLength="100"
+                stroke-dashoffset="25"
+                :stroke-dasharray="faceArcDasharray"
+                class="transition-[stroke-dasharray] duration-150 ease-linear"
+                data-testid="face-progress-arc"
+              />
+            </template>
           </svg>
 
           <!-- Front/back camera swap (R4-T5, new user requirement): same
@@ -311,7 +459,7 @@ watch(
                identical by hand). toggleFacing() itself re-guards on
                state.phase === 'preview' (spec: guard lives in the
                composable), so this v-if is belt-and-braces.
-               Fix round 1 MAJOR 1: placed AFTER the oval scrim SVG above —
+               Fix round 1 MAJOR 1: placed AFTER the face-guide scrim SVG above —
                it used to sit before it, so the scrim's fill-opacity
                composited OVER the button and it read dimmed/disabled. Fix
                round 1 minor 5: disabled + swapped for a spinner while
