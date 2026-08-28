@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PAIN FACE to Care">
+  <!--
+    App icon: navy (#1e3a5f, the app's primary color — see tailwind.config.js
+    theme.extend.colors.primary.DEFAULT) rounded-square background, a white
+    face-outline (neutral expression — the thing this app scores) with a
+    small white medical-cross badge (the "to Care" hand-off). Used for both
+    the "any" and "maskable" manifest icon purposes; every element sits
+    inside the centered 80%-diameter safe-zone circle (r=204.8 about
+    256,256) so OS masking never clips it.
+  -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="#1e3a5f" />
+
+  <!-- face outline -->
+  <circle cx="256" cy="236" r="120" fill="none" stroke="#ffffff" stroke-width="18" />
+  <circle cx="210" cy="210" r="12" fill="#ffffff" />
+  <circle cx="302" cy="210" r="12" fill="#ffffff" />
+  <path d="M 210 270 Q 256 290 302 270" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" />
+
+  <!-- medical-cross badge -->
+  <circle cx="348" cy="332" r="50" fill="#ffffff" />
+  <rect x="338" y="304" width="20" height="56" rx="6" fill="#1e3a5f" />
+  <rect x="320" y="322" width="56" height="20" rx="6" fill="#1e3a5f" />
+</svg>

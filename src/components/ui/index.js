@@ -1,0 +1,16 @@
+// Central barrel for the ui component library. Wave-3 views import
+// everything through this file: `import { BaseButton, ... } from '@/components/ui'`.
+export { default as BaseButton } from './BaseButton.vue'
+export { default as BaseInput } from './BaseInput.vue'
+export { default as BaseTextarea } from './BaseTextarea.vue'
+export { default as BaseModal } from './BaseModal.vue'
+export { default as StatusBadge } from './StatusBadge.vue'
+export { default as Icon } from './Icon.vue'
+export { default as StepProgress } from './StepProgress.vue'
+export { default as PainScalePicker } from './PainScalePicker.vue'
+export { default as ScoreTileGroup } from './ScoreTileGroup.vue'
+export { default as ChecklistGroup } from './ChecklistGroup.vue'
+export { default as YesNoDetail } from './YesNoDetail.vue'
+export { default as SectionCard } from './SectionCard.vue'
+export { default as ToastContainer } from './ToastContainer.vue'
+export { useToast } from './useToast.js'
